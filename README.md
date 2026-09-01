@@ -25,11 +25,11 @@ hardware access.
   driver. Linker owns discovery/pairing, protocol and DP mapping, credentials,
   device state, and read-after-write confirmation.
 - [`server-dashboard`](https://github.com/OpenHDO/server-dashboard) is a
-  reusable React/TypeScript module for visual components and composition.
-- [`app`](https://github.com/OpenHDO/app) is only the packager, launcher, and
-  build wrapper for an already-built dashboard artifact. It is neither a React
-  client nor a UI. Neither package is a hardware runtime or replaces Server or
-  Linker.
+  reusable React/TypeScript UI module for visual components and composition.
+- [`app`](https://github.com/OpenHDO/app) is the packager/build wrapper and
+  manifest producer for an external platform launcher. It does not implement
+  the launcher runtime, is neither a React client nor a UI, and does not replace
+  Server or Linker.
 
 ## What is still blocked for the real Sirius lamp
 
@@ -88,9 +88,11 @@ npm run build
 ```
 
 When `web/dist/index.html` exists, Server serves it at `/admin`.
-`server-dashboard` provides the reusable React/TypeScript visual components and
-composition; `app` only packages, launches, or wraps the already-built
-dashboard artifact. `app` is neither a React client nor a UI.
+`server-dashboard` provides the reusable React/TypeScript UI module for visual
+components and composition; `app` packages/wraps the already-built dashboard
+artifact and produces the manifest consumed by an external platform launcher.
+`app` does not implement the launcher runtime and is neither a React client nor
+a UI.
 
 ### 2. Install Linker
 
