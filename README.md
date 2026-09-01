@@ -1,34 +1,53 @@
-# Get started: native Python Linker for one real Wi-Fi RGB lamp
+# Get started: native Python Linker for Sirius LED Smart C37
 
-This guide is for one physical Wi-Fi RGB lamp and one PC running the local
-OpenHDO processes. Wi-Fi is only the network transport; OpenHDO does not
-define one universal Wi-Fi lamp protocol.
+This guide is for one physical Sirius LED Smart C37 lamp and one PC running
+the local OpenHDO processes. The target is a Wi-Fi RGBW C37/E14 lamp. Wi-Fi is
+only the network transport; OpenHDO does not define one universal Wi-Fi lamp
+protocol.
 
 The exact vendor and model are a hard prerequisite. Do not start with a
 product family, a guessed endpoint, or a generic Wi-Fi implementation. Record
-the full model, hardware revision, firmware, region, and the vendor’s local
+the full model, hardware revision, firmware, region, and the vendor's local
 API documentation before choosing a driver path.
 
-## Current status
+Public product evidence describes this SIRIUS Light C37/E14 lamp as RGBW with
+Wi-Fi/BLE connectivity and Tuya/Smart Life compatibility
+([public listing](https://m.integration.vs.market.yandex.net/card/umnaya-lampa-e14-rgbw-5w-wi-fi-yandeks-alisa-marusya-tuya-smart-life-sirius/102931012657)).
+This is not authoritative local-API documentation. Treat Tuya/Smart Life as
+unconfirmed until the exact lamp packaging, manual, firmware, region, and
+vendor API confirm it.
 
-Working in the checked-in repositories:
+The public OpenHDO object is an ordinary `light`. Public state and commands
+must use vendor-neutral concepts such as light identity, power, brightness,
+and RGB color. Vendor names, protocol fields, device keys, and network
+addresses are adapter-internal and do not belong in the public light payload.
 
-- the C++ server can build and run a one-shot configuration/readiness check;
-- the server’s versioned v1 envelope and Linker manifest contract exist;
-- the Python SDK validates envelopes and creates link.register messages;
-- the Linker repository defines the ownership boundary for hardware access.
+## Current stage
 
-Not shipped:
+The target architecture is a Python server backend/runtime with HTTP,
+WebSocket, and API boundaries, plus React web panels. The current published
+repositories are not yet at that runtime stage:
 
-- a native Python Linker process or entry point;
-- a vendor-specific Wi-Fi driver for any lamp;
-- a device discovery or pairing implementation;
-- an OpenHDO wire adapter for Linker traffic;
-- a public RGB command/state contract;
-- a long-running OpenHDO HTTP/WebSocket service.
+- `server/contracts/v1/` contains the committed, versioned, vendor-neutral
+  Light v1 schemas and examples;
+- `server/python/` contains a reference SDK for validated envelopes and
+  `link.register`, not the Python server runtime;
+- `server/web/` contains the React panel shell and its build scripts, but it is
+  not connected to a live API or lamp state;
+- published `linker/main` contains the typed Python driver boundary,
+  reconnect supervisor, JSON-line boundary, and contract tests, but no
+  runnable Linker process or Sirius/Tuya driver.
 
-Therefore the commands below verify the current server and Python SDK building
-blocks. They do not claim that OpenHDO can control the lamp yet.
+The following are not currently runnable from the published repositories:
+
+- a Python server process with HTTP or WebSocket endpoints;
+- a native Python Linker process entry point;
+- a server-to-Linker transport adapter;
+- a Sirius-specific local Wi-Fi driver, discovery, or pairing implementation;
+- physical lamp control or an end-to-end health result.
+
+C++ code in the server repository is optional native/SDK foundation only. This
+guide does not use a C++ server runtime as the onboarding path.
 
 ## Prerequisites
 
@@ -38,8 +57,8 @@ Fill this out from the physical device and vendor documentation:
 
 | Field | Required value |
 | --- | --- |
-| Vendor | Exact vendor/legal product owner |
-| Model | Full model or part number, not only the family name |
+| Vendor | Sirius / exact legal vendor from the lamp or manual |
+| Model | Sirius LED Smart C37, plus the full model or part number |
 | Hardware revision | Printed revision, if present |
 | Firmware | Exact firmware version |
 | Region | Region/account/API variant |
@@ -48,239 +67,293 @@ Fill this out from the physical device and vendor documentation:
 | Discovery | Vendor-defined discovery method or a configured device address |
 | RGB semantics | RGB range, brightness range, power behavior, and readback support |
 
-If the vendor exposes only a cloud API or only an undocumented mobile-app
-protocol, this is not yet a verified native local Wi-Fi path. Do not substitute
-a guessed protocol.
+The product shape above is a target identification, not proof that every
+Sirius C37 unit shares one API. The exact unit still controls the driver
+decision.
 
-### PC and network
+If the vendor exposes only a cloud API or only an undocumented mobile-app
+protocol, this is not a verified native local Wi-Fi path. Do not substitute a
+guessed protocol.
+
+### PC, network, and software
 
 - Python 3.11 or newer;
-- Git;
+- Git and CMake 3.20 or newer for the published Linker contract check;
+- Node.js and npm for the React panel shell check;
 - a local network shared by the PC and lamp;
 - the lamp provisioned onto that network according to the vendor procedure;
-- firewall rules that allow the vendor’s documented local traffic;
+- firewall rules that allow the vendor's documented local traffic;
 - vendor documentation for timeouts, rate limits, reconnects, and errors.
 
-The current Python SDK is stdlib-only. A real driver may need a
-vendor-specific dependency, but that choice cannot be made before the exact
-model and API are known.
+The reference SDK is stdlib-only. A real driver may need a vendor-specific
+dependency, but do not install or select one until the exact model and API are
+confirmed. The published Linker repository has no installable driver package
+or universal Wi-Fi dependency.
 
 ### Credentials
 
-Use the credential type and scope required by the vendor API. Keep secrets
-outside Git, README files, shell history, source code, and structured logs.
-Prefer a permissions-restricted local secret store or file, and document
+Use the credential type and scope required by the confirmed vendor API. Keep
+secrets outside Git, README files, shell history, source code, and structured
+logs. Prefer a permissions-restricted local secret store or file, and document
 rotation and expiry behavior.
 
-The current OpenHDO Python SDK has no credential store and no Linker
-configuration schema. Do not invent environment variables or config keys and
-assume the SDK will read them; the native Linker must define and validate its
-own configuration as part of its implementation.
+The published OpenHDO SDK and Linker boundary do not provide a credential
+store or a universal configuration-file schema. Do not invent environment
+variables or config keys and assume the runtime will read them; the concrete
+native driver must define and validate its own configuration.
 
-## 1. Server preflight
+## 1. Verify the Python server contract and panel shell
 
-This checks the local OpenHDO foundation before any driver work. It is not a
-lamp health check and does not open a network listener.
+There is no server start command to document yet. The current server
+repository does not publish a Python backend entry point, HTTP health route,
+WebSocket endpoint, or API listener. Do not treat a panel screen as proof of
+server or lamp health.
+
+Run the committed Python reference SDK checks from a fresh server checkout.
+These validate the versioned message helpers only:
 
 ### Linux or macOS
 
 ~~~bash
 git clone https://github.com/OpenHDO/server.git server
-cd server
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
-./build/dev/openhdo-server --check
-./build/dev/ohdocli --version
-~~~
-
-### Windows with Visual Studio
-
-The normal Visual Studio generator is multi-config:
-
-~~~powershell
-git clone https://github.com/OpenHDO/server.git server
-Set-Location server
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
-& .\build\dev\Debug\openhdo-server.exe --check
-& .\build\dev\Debug\ohdocli.exe --version
-~~~
-
-If CMake selected a single-config generator, use:
-
-~~~powershell
-& .\build\dev\openhdo-server.exe --check
-& .\build\dev\ohdocli.exe --version
-~~~
-
-### Windows with MinGW-w64
-
-~~~powershell
-git clone https://github.com/OpenHDO/server.git server
-Set-Location server
-cmake --preset dev-mingw
-cmake --build --preset dev-mingw
-ctest --preset dev-mingw
-& .\build\dev-mingw\openhdo-server.exe --check
-& .\build\dev-mingw\ohdocli.exe --version
-~~~
-
-A successful server check includes an info-level foundation.ready JSON record
-and an ok openhdo-server 0.1.0 (protocol v1) line. The process exits after
-the check. It is not the Linker process and it does not listen for lamp
-traffic.
-
-The server’s supported local settings are OPENHDO_CONFIG_VERSION,
-OPENHDO_INSTANCE_NAME, and OPENHDO_LOG_LEVEL. They configure the server
-foundation only. They do not configure a Python driver or lamp credentials.
-
-## 2. Native Python Linker path
-
-The only current Python implementation is the reference SDK under
-server/python. It provides Envelope, ProtocolError, and LinkerManifest; it
-does not provide a process, socket client, vendor driver, discovery, pairing,
-or health endpoint.
-
-Run its existing checks:
-
-~~~bash
 cd server/python
-python -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -v
 ~~~
 
-PowerShell:
+### Windows PowerShell
 
 ~~~powershell
+git clone https://github.com/OpenHDO/server.git server
 Set-Location server\python
 py -3 -m unittest discover -s tests -v
 ~~~
 
-The test command should finish with OK. LinkerManifest.registration() can
-serialize the current v1 link.register message, but the repository has no
-transport that sends it to the server. The message contains v equal to 1,
-type link.register, a unique id, a timestamp, a source, and the manifest
-payload.
+The command should finish with `OK`. `LinkerManifest.registration()` can
+serialize the current v1 `link.register` message, but no transport sends it to
+the server and it does not control a lamp.
 
-A real native Python Linker must add, in this order:
+The React panel shell can be checked separately:
 
-1. A validated configuration for the exact vendor/model, device address or
-   discovery settings, credential reference, timeouts, retry policy, and
-   Linker identity. No such configuration schema exists in the current SDK.
-2. A vendor-specific driver that uses the documented local API to authenticate,
-   discover or address the lamp, pair if required, read state, set power,
-   set RGB color, set brightness, and normalize vendor errors.
-3. A process entry point and lifecycle that starts only after configuration
-   validation, never logs secrets, and reports useful health information.
-4. A server-facing adapter that emits only committed, versioned OpenHDO
-   contracts. The current checked-in public contract is link.register; do not
-   invent an RGB command name or payload.
-5. Reconnect and shutdown behavior that preserves device identity and makes
-   failures observable without claiming a successful write.
+~~~powershell
+Set-Location server\web
+npm ci
+npm run build
+npm run dev
+~~~
 
-The driver belongs in the separate OpenHDO Linker process boundary, not in the
-server. The Linker repository is currently a scaffold and has no native
-Python entry point or vendor driver to run.
+`npm run build` is the available panel check. `npm run dev` serves the React
+shell for local inspection; the current shell has no live API connection and
+must not be presented as a working device dashboard.
 
-## 3. Pairing and discovery for the physical lamp
+## 2. Verify the native Python Linker boundary
 
-These are vendor-specific acceptance steps, not generic OpenHDO commands:
+The published Linker repository is a library boundary, not an executable.
+Its `VendorRgbDriver` interface owns real discovery, credentials, connection,
+state polling/subscription, power/RGB operations, and health. Its
+`LinkerBoundary` owns envelope validation, correlation, and duplicate-safe
+command handling. No physical I/O occurs in this contract check.
 
-1. Put the lamp on the same LAN as the PC and record the vendor-required
-   address or discovery scope.
-2. Complete the vendor’s pairing flow and record the exact credential or
-   session requirement. A reachable IP is not proof that authentication works.
-3. Discover only the exact vendor/model/revision or require an explicit stable
-   device identifier. Never select the first Wi-Fi device returned.
-4. Read the lamp state through the documented local API before issuing writes.
-5. Confirm that the API exposes the requested RGB and brightness semantics;
-   preserve the vendor’s reported values and units.
-6. Issue one documented power/color change, then read back the state. If the
-   API has no readback, report that limitation instead of inferring success.
-7. Verify the failure paths: invalid credentials, missing device, timeout,
-   rate limit, malformed response, and reconnect after a short network loss.
+### Linux or macOS
 
-The current OpenHDO repositories do not implement any of these steps. Do not
-document a vendor endpoint, payload, port, pairing code, or discovery packet
-until the exact lamp model is supplied and its official API has been checked.
+~~~bash
+git clone https://github.com/OpenHDO/linker.git linker
+cd linker
+cmake -S . -B build
+ctest --test-dir build -C Debug --output-on-failure
+~~~
 
-## 4. Health checks
+### Windows PowerShell
 
-Use these checks in the following order:
+~~~powershell
+git clone https://github.com/OpenHDO/linker.git linker
+Set-Location linker
+cmake -S . -B build
+ctest --test-dir build -C Debug --output-on-failure
+~~~
+
+This check should finish with `OK`. The current published Linker source has
+no process entry point, no vendor driver module for this lamp, and no command
+that can be used to start a hardware session. Do not invent a `python -m`
+startup command until that entry point is committed.
+
+## 3. Public light contract
+
+The public object is an ordinary `light`, never a vendor device type. The
+committed server Light v1 contract defines these versioned message types:
+
+- `light.command.power` — `light_id`, `command_id`, `idempotency_key`, and
+  boolean `power`;
+- `light.command.brightness` — the same command identity fields and integer
+  `brightness` from 0 to 255;
+- `light.command.rgb_color` — the same command identity fields and `r`, `g`,
+  and `b` channels from 0 to 255;
+- `light.state.reported` — the latest observed `power`, `brightness`, RGB
+  color, and `state_revision`;
+- `light.state.changed` — an observed state change correlated to the command
+  and repeating its command identity metadata.
+
+Every message is a v1 envelope. Commands have a correlation identifier;
+retries reuse the logical command and idempotency key. The schemas are logical
+contracts, not an HTTP or WebSocket transport.
+
+The lamp is marketed as RGBW, but the current public contract exposes RGB
+only. Do not add a white-channel field to public messages from vendor data.
+Keep white-channel handling internal until a separately versioned public
+contract exists.
+
+The Linker boundary currently uses its own internal `link.register`,
+`link.state`, `command`, and `command.result` messages. No committed adapter
+connects those messages to the server's `light.command.*` and
+`light.state.*` schemas. Therefore the two contract checks above are not an
+end-to-end control path.
+
+## 4. Native driver path for the physical lamp
+
+This is the only hardware path covered by this guide:
+
+1. Confirm the exact Sirius model, revision, firmware, region, and documented
+   local API.
+2. Confirm that the API is a supported local Wi-Fi protocol and that it
+   exposes authentication, discovery or explicit addressing, state readback,
+   power, RGB, and brightness operations for this exact unit.
+3. Implement or select a native Python driver that satisfies the published
+   Linker driver boundary. It must own protocol encoding/decoding, credentials,
+   discovery, pairing, acknowledgements, bounded retries, reconnects, and
+   vendor-error normalization.
+4. Validate configuration before opening a connection. Require the exact
+   model identity, device identity, vendor address/discovery settings,
+   credential reference, protocol version, value ranges, timeout, retry, and
+   Linker identity. Never log credentials.
+5. Discover or address the device using the vendor procedure, then reject an
+   ambiguous result. A reachable device is not proof of authentication or
+   model compatibility.
+6. Read state before the first write. Verify power, RGB, brightness, units,
+   and readback semantics.
+7. Issue one documented power or RGB change, read the state back, and record
+   whether the physical result matches. A successful network response without
+   readback is not proof of a lamp change.
+8. Publish only the ordinary, versioned OpenHDO light state and commands at
+   the boundary. Keep vendor fields and credentials inside the adapter.
+
+The current published repositories stop before steps 3 through 8 are
+complete for Sirius. The correct onboarding result today is a documented
+blocker, not a claimed successful lamp control.
+
+## Advanced adapter setup: possible Tuya-compatible details
+
+Keep this section out of the public light model. Public evidence suggests
+Tuya/Smart Life, but does not confirm the local protocol for this exact lamp.
+Only after the packaging, firmware, region, and authoritative vendor/API
+evidence confirm it may a native adapter investigate details such as:
+
+- `tuya_local`: an internal adapter/protocol label, not a public capability or
+  an OpenHDO runtime;
+- DP mapping: the exact device-property mapping for power, mode, brightness,
+  RGBW, and any color-temperature fields;
+- `local_key`: a device credential kept in a protected secret store and never
+  placed in source, envelopes, or logs;
+- `IP`: the discovered or configured local address, which may change and must
+  not become the public device identity;
+- protocol version, port, timeout, retry, acknowledgement, and readback
+  behavior: values taken from the exact device/API evidence, never copied from
+  another compatible product.
+
+Do not fill in DP IDs, credential-acquisition steps, ports, endpoints, or
+payloads from another Tuya-compatible product. An app label or community
+guess is not enough to write or enable this driver. The current published
+Linker main does not ship a Sirius-specific Tuya adapter or a runnable process.
+
+## 5. Pairing, discovery, and health checks
+
+These are vendor-specific acceptance checks, not generic OpenHDO commands:
+
+1. Provision the lamp and PC on the same LAN according to the vendor
+   procedure.
+2. Complete the vendor pairing flow and store the required credential through
+   the driver's protected configuration path.
+3. Discover only the exact Sirius model/revision or require an explicit stable
+   device identifier. Never select the first device returned.
+4. Check driver health and connection state before sending a command.
+5. Read the lamp state and validate known power, RGB, and brightness semantics.
+6. Send one command with a stable logical command identity, then verify state
+   readback and the correlated state event.
+7. Exercise invalid credentials, missing device, timeout, malformed response,
+   rate limit, and reconnect after a short network loss.
+
+Current availability:
 
 | Check | What success means | Current availability |
 | --- | --- | --- |
-| Server --check | The OpenHDO binary and local configuration boundary start | Working |
-| Python SDK unittest | The checked-in envelope/manifest code passes | Working |
-| Vendor reachability | The exact lamp responds on its documented local API | Requires the driver |
-| Vendor authentication | Credentials are accepted without logging secrets | Requires the driver |
-| Discovery/pairing | The exact device identity is found and stable | Requires the driver |
-| Read state | Power, RGB, and brightness are returned with known semantics | Requires the driver |
-| Write/read-back | A documented change reaches the lamp and is observed | Requires the driver |
-| Linker liveness/health | The native Python process reports actionable health | No current process |
-| OpenHDO end-to-end | Linker traffic reaches a server transport and state is observable | Planned |
-
-A green server --check must never be reported as a green lamp check. The
-current server command is one-shot and transport-free.
+| Python SDK unittest | Versioned envelope/manifest helpers pass | Working |
+| React panel build | The panel shell type-checks and bundles | Working; shell only |
+| Linker contract CTest | Typed boundary, correlation, and reconnect checks pass | Working |
+| Python backend health | A live API reports server readiness | Not published |
+| Linker process health | A native process reports driver health | No process |
+| Vendor reachability/authentication | The exact lamp accepts local connection and credentials | Requires exact driver |
+| Discovery/pairing | The exact device identity is found and stable | Requires exact driver |
+| Read state | Power, RGB, and brightness use confirmed semantics | Requires exact driver |
+| Write/read-back | A physical change is observed and correlated | Requires exact driver |
+| OpenHDO end-to-end | Python API, Linker, and lamp exchange real messages | Not published |
 
 ## Troubleshooting
 
 ### The exact lamp model is unknown
 
-Stop at this point. Obtain the full model/part number, hardware revision,
-firmware, region, and official local API documentation. A vendor family name
-is insufficient for a native driver.
+Stop. Obtain the full model/part number, hardware revision, firmware, region,
+and official local API documentation. A vendor family name is insufficient.
 
 ### The vendor API works in the mobile app but not from the PC
 
 Check whether the app uses a cloud-only service, a local API, or a
-vendor-specific session. Confirm the PC is on the same LAN and that the local
-API is officially supported. Do not reverse-engineer an undocumented protocol
-as if it were a stable integration contract.
+vendor-specific session. Confirm the PC is on the same LAN and that local use
+is officially supported. Do not treat an undocumented app protocol as a
+stable driver contract.
 
 ### Discovery finds no lamp
 
 Verify the lamp is provisioned and powered, the PC is on the same network,
 the vendor discovery method is enabled, and the firewall permits the
-documented traffic. If the vendor requires a fixed address or explicit
-pairing, configure that according to the vendor documentation.
+documented traffic. If explicit addressing or pairing is required, follow the
+vendor documentation and confirm the returned identity.
 
-### The API returns 401 or 403
+### Authentication fails
 
 Re-check credential type, account/region, scope, expiry, pairing status, and
-clock requirements. Replace the credential without printing it. Do not put
-the token in a commit or a health log.
+clock requirements. Replace the credential without printing it. Never put it
+in a commit or health log.
 
 ### A write reports success but color does not change
 
-Confirm that the model supports RGB, that the payload uses the vendor’s exact
-range and field names, and that the API returns or permits a read-back check.
-A successful HTTP response alone is not proof of physical state.
+Confirm that this exact model supports RGB, that the value mapping and range
+come from its documentation, and that the API returns or permits readback. A
+successful network response alone is not proof of physical state.
 
-### The server check does not keep running
+### The panel shows healthy-looking data
 
-That is expected. openhdo-server --check validates the server foundation and
-exits; it is not a Linker runtime or a lamp gateway.
+The current React panel is a static shell. It is useful for checking the
+frontend build and layout, but it has no published Python API connection and
+does not prove server, Linker, or lamp health.
 
 ### No native Python Linker command exists
 
-That is the current repository status. The Python SDK can validate and
-serialize link.register, but the Linker process, vendor driver, discovery,
-pairing, and health command still need implementation.
+That is the current repository status. The Linker contract can be tested with
+CTest, but the native process, server transport, vendor driver, discovery,
+pairing, and health command still need committed implementation.
 
 ## Working versus planned
 
 | Area | Status |
 | --- | --- |
-| Server build, CTest, and one-shot readiness check | Working |
-| Python v1 envelope and Linker manifest helper | Working |
+| Versioned server Light v1 schemas and examples | Working / committed |
+| Python reference SDK for v1 envelopes and registration | Working / committed |
+| React panel shell build | Working / not API-connected |
+| Typed native Python Linker boundary and contract tests | Working / committed |
+| Python server HTTP/WebSocket/API runtime | Planned in server repository |
 | Native Python Linker process | Planned |
-| Exact vendor/model Wi-Fi driver | Planned after model/API identification |
-| Credentials, pairing, and discovery implementation | Planned |
-| RGB command/state contract | Planned and must be versioned |
-| Linker-to-server transport | Planned |
-| Physical lamp end-to-end control | Not runnable from current repositories |
+| Sirius-specific local Wi-Fi driver | Planned after exact model/API confirmation |
+| Vendor credentials, pairing, and discovery implementation | Planned in the driver |
+| Server-to-Linker transport adapter | Planned |
+| Physical lamp end-to-end control | Not runnable from current published repositories |
 
 ## Contributing
 
@@ -288,32 +361,39 @@ This get-started repository is main-only for this workflow. Do not create or
 switch branches here.
 
 1. Keep this guide tied to committed behavior. Do not document a vendor
-   endpoint or RGB message without the exact model/API and a committed
-   implementation or contract.
+   endpoint, message, startup command, or health route without the exact
+   model/API and a committed implementation or contract.
 2. Keep native hardware access in the Linker process. Keep credentials out of
    source, docs, logs, and commits.
-3. Add a versioned server-facing contract under server/contracts/v1/ with an
-   example and compatibility test before documenting a new RGB message.
-4. Run the relevant checks:
+3. Add or update a versioned server-facing contract under
+   `server/contracts/v1/` with an example and compatibility test before
+   documenting a new public light message.
+4. Run the relevant checks from the corresponding repository:
 
    ~~~bash
-   cmake --preset ci
-   cmake --build --preset ci
-   ctest --preset ci
-   cd python && python -m unittest discover -s tests -v
+   # server/python
+   python -m unittest discover -s tests -v
+
+   # server/web
+   npm ci
+   npm run build
+
+   # linker
+   cmake -S . -B build
+   ctest --test-dir build -C Debug --output-on-failure
    ~~~
 
-5. Review and push directly to main:
+5. For this repository, review and push directly to `main`:
 
-   ~~~bash
+   ~~~powershell
    git status --short --branch
    git diff --check
    git add README.md
-   git commit -m "docs: document native Wi-Fi Linker path"
+   git commit -m "docs: clarify native Sirius Linker onboarding"
    git push origin main
    ~~~
 
-The server’s detailed rules are in its
+The server's detailed rules are in its
 [CONTRIBUTING.md](https://github.com/OpenHDO/server/blob/master/CONTRIBUTING.md)
 and [technical documentation](https://github.com/OpenHDO/server/blob/master/DOCS.md).
 
@@ -321,6 +401,7 @@ and [technical documentation](https://github.com/OpenHDO/server/blob/master/DOCS
 
 - [Server](https://github.com/OpenHDO/server)
 - [Server v1 contracts](https://github.com/OpenHDO/server/tree/master/contracts/v1)
-- [Python SDK in the server repository](https://github.com/OpenHDO/server/tree/master/python)
-- [Linker scaffold](https://github.com/OpenHDO/linker)
+- [Python reference SDK in the server repository](https://github.com/OpenHDO/server/tree/master/python)
+- [React panel shell in the server repository](https://github.com/OpenHDO/server/tree/master/web)
+- [Linker boundary](https://github.com/OpenHDO/linker)
 - [OpenHDO architecture](https://github.com/OpenHDO/about)
