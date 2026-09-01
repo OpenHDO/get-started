@@ -99,44 +99,25 @@ py -3 -m venv .venv
 python -m pip install -e .
 ```
 
-### 3. Inspect, if the checked-out Linker publishes such a command
+### 3. Inspect the real device mapping
 
-Do not invent an `inspect` command. Check the current checkout's documented
-CLI help first:
-
-```powershell
-openhdo-linker --help
-```
-
-The published `linker/main` currently documents the read-only real-device
-smoke command rather than a separate `inspect` command. Once the verified
-values are available, it performs a real TCP connect, encrypted local poll,
-response validation, and health reporting:
-
-```powershell
-python -m openhdo_linker.smoke `
-  --ip '<actual LAN IP>' `
-  --device-id '<actual device ID>' `
-  --protocol-version '<3.1|3.2|3.3|3.4>' `
-  --dp-power <actual power DP> `
-  --dp-brightness <actual brightness DP> `
-  --dp-color <actual color DP> `
-  --color-format '<rgb_hex|hsv_hex>' `
-  --brightness-min <actual device minimum> `
-  --brightness-max <actual device maximum>
-```
-
-Store the key in a protected local file such as
+`openhdo-linker inspect` is the primary read-only way to obtain the actual DP
+mapping. Store the key in a protected local file such as
 `.secrets\tuya-local-key.txt` (that path must be in `.gitignore`), then load
-it into the process environment without printing it:
+it into the process environment without putting it in `argv`:
 
 ```powershell
 $env:OPENHDO_TUYA_LOCAL_KEY = (Get-Content .secrets\tuya-local-key.txt -Raw).Trim()
+openhdo-linker inspect `
+  --ip '<actual LAN IP>' `
+  --device-id '<actual device ID>' `
+  --protocol-version '<3.1|3.2|3.3|3.4>' `
+  --timeout <seconds>
 ```
 
-For RGBW, also provide the verified white DP and range to the smoke command.
-Discovery, where explicitly enabled by the driver, can learn address/ID
-metadata but cannot recover the local key or DP mapping.
+Do not invent the protocol, DP indexes, ranges, or color encoding: use only
+the values returned for this exact lamp and record them in the protected,
+gitignored local configuration.
 
 ### 4. Configure the verified real mapping and validate
 
@@ -163,6 +144,26 @@ openhdo-linker --validate
 For RGBW, additionally set the verified `OPENHDO_TUYA_DP_WHITE`,
 `OPENHDO_TUYA_WHITE_MIN`, and `OPENHDO_TUYA_WHITE_MAX`. Validation must fail
 closed when a mapping is missing or unconfirmed.
+
+As the next read-only state validation after mapping, run the published smoke
+command with the inspected values:
+
+```powershell
+python -m openhdo_linker.smoke `
+  --ip '<actual LAN IP>' `
+  --device-id '<actual device ID>' `
+  --protocol-version '<3.1|3.2|3.3|3.4>' `
+  --dp-power <inspected power DP> `
+  --dp-brightness <inspected brightness DP> `
+  --dp-color <inspected color DP> `
+  --color-format '<inspected rgb_hex|hsv_hex>' `
+  --brightness-min <inspected device minimum> `
+  --brightness-max <inspected device maximum>
+```
+
+For RGBW, append the inspected `--dp-white`, `--white-min`, and `--white-max`.
+The smoke command performs a read-only TCP connect, encrypted local poll,
+response validation, and health reporting.
 
 ### 5. Run Linker and verify read-back
 
