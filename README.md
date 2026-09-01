@@ -1,76 +1,91 @@
-# Get started with OpenHDO
+# Get started: native Python Linker for one real Wi-Fi RGB lamp
 
-OpenHDO is a local-first control plane for devices, computers, and
-automations. This guide gets the current foundation running and shows what
-is, and is not, connected yet.
+This guide is for one physical Wi-Fi RGB lamp and one PC running the local
+OpenHDO processes. Wi-Fi is only the network transport; OpenHDO does not
+define one universal Wi-Fi lamp protocol.
 
-The current server repository provides three independent success paths:
+The exact vendor and model are a hard prerequisite. Do not start with a
+product family, a guessed endpoint, or a generic Wi-Fi implementation. Record
+the full model, hardware revision, firmware, region, and the vendor’s local
+API documentation before choosing a driver path.
 
-- the C++ server foundation and CLI smoke checks;
-- the React/TypeScript panel shell;
-- the dependency-free Python protocol SDK.
+## Current status
 
-The server executable is not a long-running HTTP/WebSocket service yet. The
-panel therefore runs as a UI foundation with sample data; it does not connect
-to the server process. The SDK produces and validates protocol messages
-locally. These are expected boundaries in the current release, not setup
-failures.
+Working in the checked-in repositories:
+
+- the C++ server can build and run a one-shot configuration/readiness check;
+- the server’s versioned v1 envelope and Linker manifest contract exist;
+- the Python SDK validates envelopes and creates link.register messages;
+- the Linker repository defines the ownership boundary for hardware access.
+
+Not shipped:
+
+- a native Python Linker process or entry point;
+- a vendor-specific Wi-Fi driver for any lamp;
+- a device discovery or pairing implementation;
+- an OpenHDO wire adapter for Linker traffic;
+- a public RGB command/state contract;
+- a long-running OpenHDO HTTP/WebSocket service.
+
+Therefore the commands below verify the current server and Python SDK building
+blocks. They do not claim that OpenHDO can control the lamp yet.
 
 ## Prerequisites
 
-Install these before starting:
+### Required lamp identity
 
+Fill this out from the physical device and vendor documentation:
+
+| Field | Required value |
+| --- | --- |
+| Vendor | Exact vendor/legal product owner |
+| Model | Full model or part number, not only the family name |
+| Hardware revision | Printed revision, if present |
+| Firmware | Exact firmware version |
+| Region | Region/account/API variant |
+| Local API | Official local API or SDK documentation and version |
+| Authentication | Token, API key, pairing code, or vendor-specific session |
+| Discovery | Vendor-defined discovery method or a configured device address |
+| RGB semantics | RGB range, brightness range, power behavior, and readback support |
+
+If the vendor exposes only a cloud API or only an undocumented mobile-app
+protocol, this is not yet a verified native local Wi-Fi path. Do not substitute
+a guessed protocol.
+
+### PC and network
+
+- Python 3.11 or newer;
 - Git;
-- CMake 3.24 or newer;
-- a C++20 compiler and a CMake-supported generator;
-- Node.js 20 and npm for the panel (Node 20 is the server CI baseline);
-- Python 3.11 or newer for the SDK.
+- a local network shared by the PC and lamp;
+- the lamp provisioned onto that network according to the vendor procedure;
+- firewall rules that allow the vendor’s documented local traffic;
+- vendor documentation for timeouts, rate limits, reconnects, and errors.
 
-Platform notes:
+The current Python SDK is stdlib-only. A real driver may need a
+vendor-specific dependency, but that choice cannot be made before the exact
+model and API are known.
 
-- Linux: install GCC or Clang, CMake, and Ninja or Make through your
-  distribution. The dev preset uses the default generator.
-- macOS: install Xcode Command Line Tools (xcode-select --install), then
-  install CMake and use the dev preset.
-- Windows with Visual Studio: install the Desktop development with C++
-  workload and CMake. Run the commands from PowerShell or a Developer PowerShell.
-- Windows with MinGW-w64: make sure g++ and mingw32-make are on PATH; use
-  the dev-mingw preset below.
+### Credentials
 
-Check the tools before cloning if you are unsure:
+Use the credential type and scope required by the vendor API. Keep secrets
+outside Git, README files, shell history, source code, and structured logs.
+Prefer a permissions-restricted local secret store or file, and document
+rotation and expiry behavior.
 
-~~~text
-git --version
-cmake --version
-node --version
-npm --version
-python --version
-~~~
+The current OpenHDO Python SDK has no credential store and no Linker
+configuration schema. Do not invent environment variables or config keys and
+assume the SDK will read them; the native Linker must define and validate its
+own configuration as part of its implementation.
 
-On Windows, py -3 --version and py -3 -m ... can replace python -m ...
-if the Python launcher is installed but python is not on PATH.
+## 1. Server preflight
 
-## 1. Get the repositories
-
-Clone the server repository. It contains the executable, panel, SDK, and
-versioned contracts used by the first-run paths:
-
-~~~bash
-git clone https://github.com/OpenHDO/server.git server
-~~~
-
-The project overview and the separate hardware connector are documented in
-the [about repository](https://github.com/OpenHDO/about) and the
-[OpenHDO Linker repository](https://github.com/OpenHDO/linker).
-
-## 2. Run the server foundation
-
-Run these commands from the server repository root. The dev preset enables
-the C++ tests and selects a Debug build.
+This checks the local OpenHDO foundation before any driver work. It is not a
+lamp health check and does not open a network listener.
 
 ### Linux or macOS
 
 ~~~bash
+git clone https://github.com/OpenHDO/server.git server
 cd server
 cmake --preset dev
 cmake --build --preset dev
@@ -79,13 +94,9 @@ ctest --preset dev
 ./build/dev/ohdocli --version
 ~~~
 
-The first success checkpoint is output like “ok openhdo-server 0.1.0
-(protocol v1)”. The command exits after the check; it does not start a daemon.
-
 ### Windows with Visual Studio
 
-The normal Visual Studio generator is multi-config, so the executable is
-under the Debug directory:
+The normal Visual Studio generator is multi-config:
 
 ~~~powershell
 git clone https://github.com/OpenHDO/server.git server
@@ -97,8 +108,7 @@ ctest --preset dev
 & .\build\dev\Debug\ohdocli.exe --version
 ~~~
 
-If CMake selected a single-config generator instead, use these executable
-paths:
+If CMake selected a single-config generator, use:
 
 ~~~powershell
 & .\build\dev\openhdo-server.exe --check
@@ -106,9 +116,6 @@ paths:
 ~~~
 
 ### Windows with MinGW-w64
-
-The repository includes a MinGW-specific preset using the MinGW Makefiles
-generator:
 
 ~~~powershell
 git clone https://github.com/OpenHDO/server.git server
@@ -120,151 +127,200 @@ ctest --preset dev-mingw
 & .\build\dev-mingw\ohdocli.exe --version
 ~~~
 
-The server also has a ci preset. Use it when reproducing the server CI
-configuration: cmake --preset ci, cmake --build --preset ci, and
-ctest --preset ci.
+A successful server check includes an info-level foundation.ready JSON record
+and an ok openhdo-server 0.1.0 (protocol v1) line. The process exits after
+the check. It is not the Linker process and it does not listen for lamp
+traffic.
 
-## 3. Open the panel shell
+The server’s supported local settings are OPENHDO_CONFIG_VERSION,
+OPENHDO_INSTANCE_NAME, and OPENHDO_LOG_LEVEL. They configure the server
+foundation only. They do not configure a Python driver or lamp credentials.
 
-Leave the server repository root in one terminal, then use another terminal:
+## 2. Native Python Linker path
 
-~~~bash
-cd server/web
-npm ci
-npm run build
-npm run dev
-~~~
+The only current Python implementation is the reference SDK under
+server/python. It provides Envelope, ProtocolError, and LinkerManifest; it
+does not provide a process, socket client, vendor driver, discovery, pairing,
+or health endpoint.
 
-PowerShell equivalent:
-
-~~~powershell
-Set-Location server\web
-npm ci
-npm run build
-npm run dev
-~~~
-
-Open [http://localhost:4173/](http://localhost:4173/) when Vite prints its
-local URL. The port is defined in web/vite.config.ts and is strict. Stop
-the development server with Ctrl+C.
-
-The panel is currently a static foundation preview. Its device, activity,
-Linker, and flow values are UI sample data; the current server has no live
-API or WebSocket endpoint for the panel to call.
-
-## 4. Exercise the Python SDK
-
-The SDK is stdlib-only, so no package installation is required for this
-checkout. Run its tests from the SDK directory:
+Run its existing checks:
 
 ~~~bash
 cd server/python
 python -m unittest discover -s tests -v
 ~~~
 
-PowerShell, using the Windows Python launcher when needed:
+PowerShell:
 
 ~~~powershell
 Set-Location server\python
 py -3 -m unittest discover -s tests -v
 ~~~
 
-The command should finish with OK. To see the first versioned registration
-message, run this from the same directory:
+The test command should finish with OK. LinkerManifest.registration() can
+serialize the current v1 link.register message, but the repository has no
+transport that sends it to the server. The message contains v equal to 1,
+type link.register, a unique id, a timestamp, a source, and the manifest
+payload.
 
-~~~bash
-python -c 'from openhdo_sdk import LinkerManifest; print(LinkerManifest("linker.get-started", "0.1.0", "Get Started Linker", ("test",)).registration("linker.get-started").to_json())'
-~~~
+A real native Python Linker must add, in this order:
 
-Envelope validates protocol version 1, message identity, timestamps, and
-payload shape. LinkerManifest.registration() creates the link.register
-message described by the server’s
-[contracts/v1](https://github.com/OpenHDO/server/tree/master/contracts/v1).
-Transport, credentials, reconnect policy, and device libraries remain the
-responsibility of the application embedding the SDK.
+1. A validated configuration for the exact vendor/model, device address or
+   discovery settings, credential reference, timeouts, retry policy, and
+   Linker identity. No such configuration schema exists in the current SDK.
+2. A vendor-specific driver that uses the documented local API to authenticate,
+   discover or address the lamp, pair if required, read state, set power,
+   set RGB color, set brightness, and normalize vendor errors.
+3. A process entry point and lifecycle that starts only after configuration
+   validation, never logs secrets, and reports useful health information.
+4. A server-facing adapter that emits only committed, versioned OpenHDO
+   contracts. The current checked-in public contract is link.register; do not
+   invent an RGB command name or payload.
+5. Reconnect and shutdown behavior that preserves device identity and makes
+   failures observable without claiming a successful write.
+
+The driver belongs in the separate OpenHDO Linker process boundary, not in the
+server. The Linker repository is currently a scaffold and has no native
+Python entry point or vendor driver to run.
+
+## 3. Pairing and discovery for the physical lamp
+
+These are vendor-specific acceptance steps, not generic OpenHDO commands:
+
+1. Put the lamp on the same LAN as the PC and record the vendor-required
+   address or discovery scope.
+2. Complete the vendor’s pairing flow and record the exact credential or
+   session requirement. A reachable IP is not proof that authentication works.
+3. Discover only the exact vendor/model/revision or require an explicit stable
+   device identifier. Never select the first Wi-Fi device returned.
+4. Read the lamp state through the documented local API before issuing writes.
+5. Confirm that the API exposes the requested RGB and brightness semantics;
+   preserve the vendor’s reported values and units.
+6. Issue one documented power/color change, then read back the state. If the
+   API has no readback, report that limitation instead of inferring success.
+7. Verify the failure paths: invalid credentials, missing device, timeout,
+   rate limit, malformed response, and reconnect after a short network loss.
+
+The current OpenHDO repositories do not implement any of these steps. Do not
+document a vendor endpoint, payload, port, pairing code, or discovery packet
+until the exact lamp model is supplied and its official API has been checked.
+
+## 4. Health checks
+
+Use these checks in the following order:
+
+| Check | What success means | Current availability |
+| --- | --- | --- |
+| Server --check | The OpenHDO binary and local configuration boundary start | Working |
+| Python SDK unittest | The checked-in envelope/manifest code passes | Working |
+| Vendor reachability | The exact lamp responds on its documented local API | Requires the driver |
+| Vendor authentication | Credentials are accepted without logging secrets | Requires the driver |
+| Discovery/pairing | The exact device identity is found and stable | Requires the driver |
+| Read state | Power, RGB, and brightness are returned with known semantics | Requires the driver |
+| Write/read-back | A documented change reaches the lamp and is observed | Requires the driver |
+| Linker liveness/health | The native Python process reports actionable health | No current process |
+| OpenHDO end-to-end | Linker traffic reaches a server transport and state is observable | Planned |
+
+A green server --check must never be reported as a green lamp check. The
+current server command is one-shot and transport-free.
 
 ## Troubleshooting
 
-### CMake cannot find a compiler
+### The exact lamp model is unknown
 
-Confirm that a C++20 compiler is installed and visible to the shell. On
-Windows, use Developer PowerShell for Visual Studio, or check both
-g++ --version and mingw32-make --version for MinGW. Re-run the matching
-preset from the server root.
+Stop at this point. Obtain the full model/part number, hardware revision,
+firmware, region, and official local API documentation. A vendor family name
+is insufficient for a native driver.
 
-### The CMake preset is not recognized
+### The vendor API works in the mobile app but not from the PC
 
-Run cmake --version. The server requires CMake 3.24 or newer. Also make
-sure the command is being run from the server repository root, where
-CMakePresets.json exists.
+Check whether the app uses a cloud-only service, a local API, or a
+vendor-specific session. Confirm the PC is on the same LAN and that the local
+API is officially supported. Do not reverse-engineer an undocumented protocol
+as if it were a stable integration contract.
 
-### The server executable path does not exist on Windows
+### Discovery finds no lamp
 
-Visual Studio builds place the executable in a configuration directory. Look
-under build\dev\Debug\ first. MinGW uses build\dev-mingw\. A single-config
-generator uses build\dev\. Do not expect --check to keep a process
-running.
+Verify the lamp is provisioned and powered, the PC is on the same network,
+the vendor discovery method is enabled, and the firewall permits the
+documented traffic. If the vendor requires a fixed address or explicit
+pairing, configure that according to the vendor documentation.
 
-### npm ci fails
+### The API returns 401 or 403
 
-Run it from server/web, not the server root. That directory contains the
-tracked package-lock.json. If the panel port is already in use, stop the
-process using port 4173 before running npm run dev; the Vite configuration
-intentionally fails instead of silently changing ports.
+Re-check credential type, account/region, scope, expiry, pairing status, and
+clock requirements. Replace the credential without printing it. Do not put
+the token in a commit or a health log.
 
-### The panel shows sample devices or does not reflect the server check
+### A write reports success but color does not change
 
-That is expected in this release. openhdo-server --check is a one-shot
-foundation check, and the panel has no live server transport yet.
+Confirm that the model supports RGB, that the payload uses the vendor’s exact
+range and field names, and that the API returns or permits a read-back check.
+A successful HTTP response alone is not proof of physical state.
 
-### Python cannot import openhdo_sdk
+### The server check does not keep running
 
-Run the test or example from server/python, and check that Python is 3.11
-or newer. The SDK intentionally does not require pip install for this local
-first-run path.
+That is expected. openhdo-server --check validates the server foundation and
+exits; it is not a Linker runtime or a lamp gateway.
+
+### No native Python Linker command exists
+
+That is the current repository status. The Python SDK can validate and
+serialize link.register, but the Linker process, vendor driver, discovery,
+pairing, and health command still need implementation.
+
+## Working versus planned
+
+| Area | Status |
+| --- | --- |
+| Server build, CTest, and one-shot readiness check | Working |
+| Python v1 envelope and Linker manifest helper | Working |
+| Native Python Linker process | Planned |
+| Exact vendor/model Wi-Fi driver | Planned after model/API identification |
+| Credentials, pairing, and discovery implementation | Planned |
+| RGB command/state contract | Planned and must be versioned |
+| Linker-to-server transport | Planned |
+| Physical lamp end-to-end control | Not runnable from current repositories |
 
 ## Contributing
 
-1. Choose the repository and directory that own the boundary: server state and
-   orchestration live in server/; the panel is server/web/; the reference
-   SDK is server/python/; hardware transports belong in the separate Linker
-   repository.
-2. Create a focused branch, make the smallest change that fits the existing
-   boundary, and keep public messages under server/contracts/v1/.
-3. For a new public message, add its schema or payload definition, a
-   representative example, and a compatibility test before using it.
-4. Run the checks for the area you changed. For a full server check:
+This get-started repository is main-only for this workflow. Do not create or
+switch branches here.
+
+1. Keep this guide tied to committed behavior. Do not document a vendor
+   endpoint or RGB message without the exact model/API and a committed
+   implementation or contract.
+2. Keep native hardware access in the Linker process. Keep credentials out of
+   source, docs, logs, and commits.
+3. Add a versioned server-facing contract under server/contracts/v1/ with an
+   example and compatibility test before documenting a new RGB message.
+4. Run the relevant checks:
 
    ~~~bash
    cmake --preset ci
    cmake --build --preset ci
    ctest --preset ci
-   cd web && npm ci && npm run build
-   cd ../python && python -m unittest discover -s tests -v
+   cd python && python -m unittest discover -s tests -v
    ~~~
 
-5. Commit with a Conventional Commit message, push the branch, and open a
-   pull request in the repository that owns the change.
+5. Review and push directly to main:
+
+   ~~~bash
+   git status --short --branch
+   git diff --check
+   git add README.md
+   git commit -m "docs: document native Wi-Fi Linker path"
+   git push origin main
+   ~~~
 
 The server’s detailed rules are in its
 [CONTRIBUTING.md](https://github.com/OpenHDO/server/blob/master/CONTRIBUTING.md)
 and [technical documentation](https://github.com/OpenHDO/server/blob/master/DOCS.md).
 
-For a documentation-only change in this repository:
-
-~~~bash
-git switch -c docs/improve-onboarding
-git diff --check
-git add README.md
-git commit -m "docs: improve onboarding"
-git push -u origin docs/improve-onboarding
-~~~
-
 ## Repository map
 
-- [Project overview](https://github.com/OpenHDO/about)
 - [Server](https://github.com/OpenHDO/server)
-- [Server technical docs](https://github.com/OpenHDO/server/blob/master/DOCS.md)
-- [Versioned server contracts](https://github.com/OpenHDO/server/tree/master/contracts/v1)
+- [Server v1 contracts](https://github.com/OpenHDO/server/tree/master/contracts/v1)
 - [Python SDK in the server repository](https://github.com/OpenHDO/server/tree/master/python)
-- [Linker](https://github.com/OpenHDO/linker)
+- [Linker scaffold](https://github.com/OpenHDO/linker)
+- [OpenHDO architecture](https://github.com/OpenHDO/about)
