@@ -24,9 +24,12 @@ hardware access.
   runnable `openhdo-linker` process and a native Python Tuya-compatible local
   driver. Linker owns discovery/pairing, protocol and DP mapping, credentials,
   device state, and read-after-write confirmation.
-- [`app`](https://github.com/OpenHDO/app) and
-  [`server-dashboard`](https://github.com/OpenHDO/server-dashboard) are React
-  clients. They are not hardware runtimes and do not replace Server or Linker.
+- [`server-dashboard`](https://github.com/OpenHDO/server-dashboard) is a
+  reusable React/TypeScript module for visual components and composition.
+- [`app`](https://github.com/OpenHDO/app) is only the packager, launcher, and
+  build wrapper for an already-built dashboard artifact. It is neither a React
+  client nor a UI. Neither package is a hardware runtime or replaces Server or
+  Linker.
 
 ## What is still blocked for the real Sirius lamp
 
@@ -84,8 +87,10 @@ npm ci
 npm run build
 ```
 
-When `web/dist/index.html` exists, Server serves it at `/admin`. `app` and
-`server-dashboard` remain separate React clients.
+When `web/dist/index.html` exists, Server serves it at `/admin`.
+`server-dashboard` provides the reusable React/TypeScript visual components and
+composition; `app` only packages, launches, or wraps the already-built
+dashboard artifact. `app` is neither a React client nor a UI.
 
 ### 2. Install Linker
 
